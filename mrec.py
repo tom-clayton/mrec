@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#  streamtest.py
+#  mrec.py
 #  
 #  Copyright 2019 tom clayton
 #  
@@ -41,6 +41,7 @@ encode_queue = queue.Queue(5)
 class Track:
     def __init__(self):
         self.data = bytearray()
+        self.trackid = None
 
     def get_details(self, metadata):
         self.title = metadata['xesam:title']
@@ -48,6 +49,7 @@ class Track:
         self.album = metadata['xesam:album']
         self.albumartist = ', '.join(metadata['xesam:albumArtist'])
         self.track_number = metadata['xesam:trackNumber']
+        self.trackid = metadata['mpris:trackid']
         
         # check for / in names. seperate function
 
@@ -56,11 +58,11 @@ class Track:
 
         if os.path.exists(os.path.join(self.path, self.filename)):
             self.file_exists = True
-            print(f"'{metadata['xesam:title']}'  already exists")
+            print(f"\n'{self.title}'  already exists\n")
             
         else:
             self.file_exists = False
-            print(f"Recording: '{metadata['xesam:title']}'")
+            print(f"\nRecording: '{self.title}'\n")
             self.make_directories()
     
     def __del__(self):
@@ -88,11 +90,11 @@ class Track:
                         "-"],
                         input=self.data)
             
-def capture_input(player_data):
+def capture_input(recording_data):
     while True:
-        if player_data['is_playing']:
+        if recording_data['is_playing']:
             capture_mutex.acquire()
-            player_data['recording'].data.extend(sys.stdin.buffer.read(4000))
+            recording_data['recording'].data.extend(sys.stdin.buffer.read(4000))
             capture_mutex.release()
         else:
             sys.stdin.buffer.read(4000)
@@ -120,34 +122,29 @@ def get_filename(metadata):
                 ", ".join(metadata['xesam:artist']))
     
 
-def on_status(player, status, player_data):
-    player_data['is_playing'] = True if status.value_name == \
+def on_status(player, status, recording_data):
+    recording_data['is_playing'] = True if status.value_name == \
                                 "PLAYERCTL_PLAYBACK_STATUS_PLAYING" \
                                 else False
 
                       
-def on_metadata(player, metadata, player_data):
-    if player_data['prev_trackid']:
-        prev_track = player_data['recording']
-        trackid = metadata['mpris:trackid']
+def on_metadata(player, metadata, recording_data):
+    prev_track = recording_data['recording']
+    trackid = metadata['mpris:trackid']
 
-        if player_data['prev_trackid'] != trackid: # track changed.
-            # start recording new track:
-            capture_mutex.acquire()
-            player_data['recording'] = Track()
-            capture_mutex.release()
-            player_data['recording'].get_details(metadata)
+    if prev_track.trackid != trackid: # track has changed.
+        # start recording new track:
+        capture_mutex.acquire()
+        recording_data['recording'] = Track()
+        capture_mutex.release()
+        recording_data['recording'].get_details(metadata)
 
-            # encode finished track:
+        # encode finished track:
+        try:
             if not prev_track.file_exists:
                 encode_queue.put(prev_track)
-                
-            player_data['prev_trackid'] = trackid
-    
-    else: # first track
-        player_data['prev_trackid'] = metadata['mpris:trackid']
-        player_data['recording'] = Track()
-        player_data['recording'].get_details(metadata)
+        except AttributeError:
+            pass   
             
 def main(args):
     if len(args) > 1 and os.path.exists(args[1]):
@@ -161,28 +158,26 @@ def main(args):
     else:
         print("No player found, exiting")
         return -1
-        
-    player_data = {'is_playing': \
-                    True if player.get_property('playback-status').value_name == \
-                    "PLAYERCTL_PLAYBACK_STATUS_PLAYING" \
-                     else False,
-                   'prev_trackid': None,
-                   'recording': Track()}
 
+    recording_data = {'is_playing': None,   # get playing status in func call below
+                      'recording': Track()} # initial dummy track to send data to 
     
-    player.connect('metadata', on_metadata, player_data)
-    player.connect('playback-status', on_status, player_data)
-    
+    on_status(player, player.get_property('playback-status'), recording_data)
+
+    # callbacks:
+    player.connect('metadata', on_metadata, recording_data)
+    player.connect('playback-status', on_status, recording_data)
+
+    # threads:
     capture_thread = threading.Thread(target=capture_input, 
-                                      args = (player_data,),
+                                      args = (recording_data,),
                                       daemon = True)
                                       
     encode_thread = threading.Thread(target=encode_output, 
-                                      daemon = True)
-                                      
+                                      daemon = True)                        
     capture_thread.start()
     encode_thread.start()
-    player.play()
+
     main = GLib.MainLoop()
     main.run()
     
