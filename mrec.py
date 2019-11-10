@@ -44,10 +44,11 @@ class Track:
         self.trackid = None
 
     def get_details(self, metadata):
-        self.title = metadata['xesam:title']
-        self.artist = ', '.join(metadata['xesam:artist'])
-        self.album = metadata['xesam:album']
-        self.albumartist = ', '.join(metadata['xesam:albumArtist'])
+        self.title = metadata['xesam:title'].replace('/', ' ')
+        self.artist = ', '.join(metadata['xesam:artist']).replace('/', ' ')
+        self.album = metadata['xesam:album'].replace('/', ' ')
+        self.albumartist = ', '.join(metadata['xesam:albumArtist'])\
+                               .replace('/', ' ')
         self.track_number = metadata['xesam:trackNumber']
         self.trackid = metadata['mpris:trackid']
         
@@ -106,8 +107,6 @@ def encode_output():
         track.encode()
         encode_queue.task_done()
         del(track)
-
-    # check for / in names. seperate function:
 
 def get_path(metadata):
     return "{}/{}/{}".format(music_root,
