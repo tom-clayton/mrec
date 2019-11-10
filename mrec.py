@@ -34,7 +34,8 @@ import os
 import queue
 
 
-music_root = "/home/tom/Music"    
+music_root = "/home/tom/Music"
+backup_dir = None
 capture_mutex = threading.Lock()
 encode_queue = queue.Queue(5)
 
@@ -49,22 +50,22 @@ class Track:
         self.album = metadata['xesam:album'].replace('/', ' ')
         self.albumartist = ', '.join(metadata['xesam:albumArtist'])\
                                .replace('/', ' ')
-        self.track_number = metadata['xesam:trackNumber']
+        self.track_number = "0" + metadata['xesam:trackNumber'] \
+                            if int(metadata['xesam:trackNumber']) < 10 \
+                            else metadata['xesam:trackNumber']
+
         self.trackid = metadata['mpris:trackid']
+
+        self.album_path = os.path.join(self.albumartist, self.album)
+        self.filename = f"{self.track_number}{self.title} - {self.artist}.ogg"
+        self.filepath = os.path.join(self.album_path, self.filename)
         
-        # check for / in names. seperate function
-
-        self.path = get_path(metadata)
-        self.filename = get_filename(metadata)
-
-        if os.path.exists(os.path.join(self.path, self.filename)):
+        if os.path.exists(os.path.join(music_root, self.filepath)):
             self.file_exists = True
             print(f"\n'{self.title}'  already exists\n")
-            
         else:
             self.file_exists = False
             print(f"\nRecording: '{self.title}'\n")
-            self.make_directories()
     
     def __del__(self):
         try:
@@ -72,25 +73,34 @@ class Track:
         except AttributeError:
             pass
             
-    def make_directories(self):
-        albumartist_dir = os.path.join(music_root, self.albumartist)
-        if not os.path.exists(albumartist_dir):
-            os.mkdir(albumartist_dir)
-            
-        album_dir = os.path.join(albumartist_dir, self.album)
-        if not os.path.exists(album_dir):
-            os.mkdir(album_dir)
+    def make_directories(self, root):
+        artist_path = os.path.join(root, self.albumartist)
+        if not os.path.exists(artist_path):
+            os.mkdir(artist_path)
+
+        album_path = os.path.join(artist_path, self.album)   
+        if not os.path.exists(album_path):
+            os.mkdir(album_path)
             
     def encode(self):
+        self.make_directories(music_root)
         subprocess.run(["oggenc", "-r", 
                         "-q", "6",
                         "-a", self.artist,
                         "-t", self.title,
                         "-l", self.album,
-                        "-o", os.path.join(self.path, self.filename),
+                        "-o", os.path.join(music_root, filepath)
                         "-"],
                         input=self.data)
+
+    def backup(self):
+        self.make_directories(backup_dir)
+        subprocess.run(["mv",
+                        os.path.join(music_root, self.filepath),
+                        os.path.join(backup_dir, self.filepath)])
             
+
+          
 def capture_input(recording_data):
     while True:
         if recording_data['is_playing']:
@@ -103,23 +113,11 @@ def capture_input(recording_data):
 def encode_output():
     while True:
         track = encode_queue.get()
-        track.make_directories()
         track.encode()
+        if backup_dir:
+            track.backup()
         encode_queue.task_done()
         del(track)
-
-def get_path(metadata):
-    return "{}/{}/{}".format(music_root,
-                             ", ".join(metadata['xesam:albumArtist']),
-                             metadata['xesam:album'])
-
-def get_filename(metadata):
-    return "{}{} {} - {}.ogg".format(
-                "0" if int(metadata['xesam:trackNumber']) < 10 else "",
-                metadata['xesam:trackNumber'],
-                metadata['xesam:title'],
-                ", ".join(metadata['xesam:artist']))
-    
 
 def on_status(player, status, recording_data):
     recording_data['is_playing'] = True if status.value_name == \
@@ -158,8 +156,8 @@ def main(args):
         print("No player found, exiting")
         return -1
 
-    recording_data = {'is_playing': None,   # get playing status in func call below
-                      'recording': Track()} # initial dummy track to send data to 
+    recording_data = {'is_playing': False,  # track is playing 
+                      'recording': Track()} # track object to send data to 
     
     on_status(player, player.get_property('playback-status'), recording_data)
 
