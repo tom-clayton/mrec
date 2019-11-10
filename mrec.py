@@ -32,7 +32,12 @@ import threading
 import subprocess
 import os
 import queue
+import logging
 
+logging.basicConfig(level=logging.DEBUG,
+                    filename='/home/tom/mrec.log',
+                    filemode='a',
+                    format='%(asctime)s - %(message)s')
 
 music_root = "/home/tom/Music"
 backup_dir = None
@@ -62,14 +67,15 @@ class Track:
         
         if os.path.exists(os.path.join(music_root, self.filepath)):
             self.file_exists = True
-            print(f"\n'{self.title}'  already exists\n")
+            
+            logging.info(f"'{self.title}'  already exists")
         else:
             self.file_exists = False
-            print(f"\nRecording: '{self.title}'\n")
+            logging.info(f"Recording: '{self.title}'")
     
     def __del__(self):
         try:
-            print (f"'{self.title}' data deleted") 
+            logging.info(f"'{self.title}' data deleted") 
         except AttributeError:
             pass
             
@@ -151,9 +157,9 @@ def main(args):
     player = Playerctl.Player() 
     player_name = player.get_property('player-name')
     if player_name:
-        print(f"Found player: {player_name}")
+        logging.info('Mrec started, {player_name} found)
     else:
-        print("No player found, exiting")
+        logging.info('No player found, exiting')
         return -1
 
     recording_data = {'is_playing': False,  # track is playing 
