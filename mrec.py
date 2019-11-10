@@ -55,9 +55,9 @@ class Track:
         self.album = metadata['xesam:album'].replace('/', ' ')
         self.albumartist = ', '.join(metadata['xesam:albumArtist'])\
                                .replace('/', ' ')
-        self.track_number = "0" + metadata['xesam:trackNumber'] \
-                            if int(metadata['xesam:trackNumber']) < 10 \
-                            else metadata['xesam:trackNumber']
+        self.track_number = "0" + str(metadata['xesam:trackNumber']) \
+                            if metadata['xesam:trackNumber'] < 10 \
+                            else str(metadata['xesam:trackNumber'])
 
         self.trackid = metadata['mpris:trackid']
 
@@ -95,7 +95,7 @@ class Track:
                         "-a", self.artist,
                         "-t", self.title,
                         "-l", self.album,
-                        "-o", os.path.join(music_root, filepath)
+                        "-o", os.path.join(music_root, filepath),
                         "-"],
                         input=self.data)
 
@@ -157,9 +157,9 @@ def main(args):
     player = Playerctl.Player() 
     player_name = player.get_property('player-name')
     if player_name:
-        logging.info('Mrec started, {player_name} found)
+        logging.info(f"Mrec started, {player_name} found")
     else:
-        logging.info('No player found, exiting')
+        logging.info("No player found, exiting")
         return -1
 
     recording_data = {'is_playing': False,  # track is playing 
