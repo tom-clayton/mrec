@@ -28,6 +28,7 @@ gi.require_version('Playerctl', '2.0')
 
 from gi.repository import Playerctl, GLib
 import sys
+import time
 import threading
 import subprocess
 import os
@@ -153,14 +154,14 @@ def main(args):
     if len(args) > 1 and os.path.exists(args[1]):
         global music_root
         music_root = args[1]
-   
-    player = Playerctl.Player() 
-    player_name = player.get_property('player-name')
-    if player_name:
-        logging.info(f"Mrec started, {player_name} found")
-    else:
-        logging.info("No player found, exiting")
-        return -1
+
+    player_name = None
+    while not player_name:
+        player = Playerctl.Player() 
+        player_name = player.get_property('player-name')
+        time.sleep(5)
+    
+    logging.info(f"Mrec started, {player_name} found")
 
     recording_data = {'is_playing': False,  # track is playing 
                       'recording': Track()} # track object to send data to 
