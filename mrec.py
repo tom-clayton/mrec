@@ -96,7 +96,7 @@ class Track:
                         "-a", self.artist,
                         "-t", self.title,
                         "-l", self.album,
-                        "-o", os.path.join(music_root, filepath),
+                        "-o", os.path.join(music_root, self.filepath),
                         "-"],
                         input=self.data)
 
