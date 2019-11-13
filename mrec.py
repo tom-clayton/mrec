@@ -102,7 +102,7 @@ class Track:
 
     def backup(self):
         self.make_directories(backup_dir)
-        subprocess.run(["mv",
+        subprocess.run(["cp",
                         os.path.join(music_root, self.filepath),
                         os.path.join(backup_dir, self.filepath)])
             
