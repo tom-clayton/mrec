@@ -63,7 +63,7 @@ class Track:
         self.trackid = metadata['mpris:trackid']
 
         self.album_path = os.path.join(self.albumartist, self.album)
-        self.filename = f"{self.track_number}{self.title} - {self.artist}.ogg"
+        self.filename = f"{self.track_number} {self.title} - {self.artist}.ogg"
         self.filepath = os.path.join(self.album_path, self.filename)
         
         if os.path.exists(os.path.join(music_root, self.filepath)):
