@@ -35,7 +35,7 @@ import os
 import queue
 import logging
 
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.INFO,
                     filename='/home/tom/mrec.log',
                     filemode='a',
                     format='%(asctime)s - %(message)s')
@@ -52,6 +52,8 @@ class Track:
 
     def get_details(self, metadata):
         self.title = metadata['xesam:title'].replace('/', ' ')
+        if self.title = '':
+            return False
         self.artist = ', '.join(metadata['xesam:artist']).replace('/', ' ')
         self.album = metadata['xesam:album'].replace('/', ' ')
         self.albumartist = ', '.join(metadata['xesam:albumArtist'])\
@@ -61,7 +63,7 @@ class Track:
                             else str(metadata['xesam:trackNumber'])
 
         self.trackid = metadata['mpris:trackid']
-
+        
         self.album_path = os.path.join(self.albumartist, self.album)
         self.filename = f"{self.track_number} {self.title} - {self.artist}.ogg"
         self.filepath = os.path.join(self.album_path, self.filename)
@@ -69,14 +71,20 @@ class Track:
         if os.path.exists(os.path.join(music_root, self.filepath)):
             self.file_exists = True
             
-            logging.info(f"'{self.title}'  already exists")
+            print(f"'{self.title}'  already exists")
         else:
             self.file_exists = False
-            logging.info(f"Recording: '{self.title}'")
+           print(f"Recording: '{self.title}'")
+
+        return True
     
     def __del__(self):
         try:
-            logging.info(f"'{self.title}' data deleted") 
+            print(f"'{self.title}' data deleted")
+            if self.file_exists:
+                logging.info(f"'{self.title}' not recorded.")
+            else:
+                logging.info(f"'{self.title}' recorded.")
         except AttributeError:
             pass
             
@@ -141,7 +149,10 @@ def on_metadata(player, metadata, recording_data):
         capture_mutex.acquire()
         recording_data['recording'] = Track()
         capture_mutex.release()
-        recording_data['recording'].get_details(metadata)
+        if not recording_data['recording'].get_details(metadata):
+            if not recording_data['recording'].get_details(
+                                            playerlayer.get_property('metadata'):
+                print("error: no data from track")
 
         # encode finished track:
         try:
