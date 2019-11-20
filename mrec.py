@@ -52,7 +52,7 @@ class Track:
 
     def get_details(self, metadata):
         self.title = metadata['xesam:title'].replace('/', ' ')
-        if self.title = '':
+        if self.title == '':
             return False
         self.artist = ', '.join(metadata['xesam:artist']).replace('/', ' ')
         self.album = metadata['xesam:album'].replace('/', ' ')
@@ -74,7 +74,7 @@ class Track:
             print(f"'{self.title}'  already exists")
         else:
             self.file_exists = False
-           print(f"Recording: '{self.title}'")
+            print(f"Recording: '{self.title}'")
 
         return True
     
@@ -151,7 +151,7 @@ def on_metadata(player, metadata, recording_data):
         capture_mutex.release()
         if not recording_data['recording'].get_details(metadata):
             if not recording_data['recording'].get_details(
-                                            playerlayer.get_property('metadata'):
+                                        player.get_property('metadata')):
                 print("error: no data from track")
 
         # encode finished track:
