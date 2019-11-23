@@ -35,7 +35,7 @@ import os
 import queue
 import logging
 
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.DEBUG,
                     filename='/home/tom/mrec.log',
                     filemode='a',
                     format='%(asctime)s - %(message)s')
@@ -81,7 +81,7 @@ class Track:
     def __del__(self):
         try:
             print(f"'{self.title}' data deleted")
-            if self.file_exists:
+            if self.file_exists and self.data:
                 logging.info(f"'{self.title}' not recorded.")
             else:
                 logging.info(f"'{self.title}' recorded.")
@@ -156,7 +156,7 @@ def on_metadata(player, metadata, recording_data):
 
         # encode finished track:
         try:
-            if not prev_track.file_exists:
+            if not prev_track.file_exists and prev_track.data:
                 encode_queue.put(prev_track)
         except AttributeError:
             pass   
