@@ -41,7 +41,7 @@ logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(message)s')
 
 music_root = "/home/tom/Music"
-backup_dir = None
+backup_dir = "/home/tom/music_backup" 
 capture_mutex = threading.Lock()
 encode_queue = queue.Queue(5)
 
