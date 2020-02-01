@@ -53,6 +53,7 @@ class Track:
     def __init__(self):
         self.data = bytearray()
         self.trackid = None
+        self.encoded = False
 
     def get_details(self, metadata):
         self.title = metadata['xesam:title'].replace('/', ' ')
@@ -84,11 +85,10 @@ class Track:
     
     def __del__(self):
         try:
-            print(f"'{self.title}' data deleted")
-            if self.file_exists and self.data:
-                logging.info(f"'{self.title}' not recorded.")
-            else:
+            if self.encoded:
                 logging.info(f"'{self.title}' recorded.")
+            else:
+                logging.info(f"'{self.title}' not recorded.")
         except AttributeError:
             pass
             
@@ -136,6 +136,7 @@ def encode_output():
         if backup_dir:
             track.backup()
         encode_queue.task_done()
+        track.encoded = True
         del(track)
 
 def on_status(player, status, recording_data):
@@ -149,6 +150,8 @@ def on_metadata(player, metadata, recording_data):
         return
     prev_track = recording_data['track']
     trackid = metadata['mpris:trackid']
+    
+    #print(prev_track.trackid, trackid)
 
     if prev_track.trackid != trackid: # track has changed.
         # start recording new track:
@@ -158,8 +161,9 @@ def on_metadata(player, metadata, recording_data):
         if not recording_data['track'].get_details(metadata):
             if not recording_data['track'].get_details(
                                         player.get_property('metadata')):
-                print("error: no data from track")
+                logging.debug("error: no data from track")
 
+        logging.debug(f"New: '{recording_data['track'].title}'")
         # encode finished track:
         try:
             if not prev_track.file_exists and prev_track.data:
@@ -173,8 +177,10 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, recording_data, msg):
     if msg.payload.decode() == "record":
         recording_data['recording'] = True
+        logging.debug("recording on")
     elif msg.payload.decode() == "stop":
         recording_data['recording'] = False
+        logging.debug("recording off")
             
 def main(args):
     if len(args) > 1 and os.path.exists(args[1]):
@@ -199,7 +205,7 @@ def main(args):
     client.on_connect = on_connect
     client.on_message = on_message
     client.user_data_set(recording_data)
-    client.connect(broker_address, 1883, 60)
+    client.connect(broker, 1883, 60)
 
     # callbacks:
     player.connect('metadata', on_metadata, recording_data)
