@@ -27,6 +27,7 @@ import gi
 gi.require_version('Playerctl', '2.0')
 
 from gi.repository import Playerctl, GLib
+import paho.mqtt.client as mqtt
 import sys
 import time
 import threading
@@ -42,6 +43,9 @@ logging.basicConfig(level=logging.DEBUG,
 
 music_root = "/home/tom/Music"
 backup_dir = "/home/tom/music_backup" 
+
+broker = "localhost"
+
 capture_mutex = threading.Lock()
 encode_queue = queue.Queue(5)
 
@@ -118,9 +122,9 @@ class Track:
           
 def capture_input(recording_data):
     while True:
-        if recording_data['is_playing']:
+        if recording_data['playing'] and recording_data['recording']:
             capture_mutex.acquire()
-            recording_data['recording'].data.extend(sys.stdin.buffer.read(4000))
+            recording_data['track'].data.extend(sys.stdin.buffer.read(4000))
             capture_mutex.release()
         else:
             sys.stdin.buffer.read(4000)
@@ -135,22 +139,24 @@ def encode_output():
         del(track)
 
 def on_status(player, status, recording_data):
-    recording_data['is_playing'] = True if status.value_name == \
+    recording_data['playing'] = True if status.value_name == \
                                 "PLAYERCTL_PLAYBACK_STATUS_PLAYING" \
                                 else False
 
                       
 def on_metadata(player, metadata, recording_data):
-    prev_track = recording_data['recording']
+    if not recording_data['recording']:
+        return
+    prev_track = recording_data['track']
     trackid = metadata['mpris:trackid']
 
     if prev_track.trackid != trackid: # track has changed.
         # start recording new track:
         capture_mutex.acquire()
-        recording_data['recording'] = Track()
+        recording_data['track'] = Track()
         capture_mutex.release()
-        if not recording_data['recording'].get_details(metadata):
-            if not recording_data['recording'].get_details(
+        if not recording_data['track'].get_details(metadata):
+            if not recording_data['track'].get_details(
                                         player.get_property('metadata')):
                 print("error: no data from track")
 
@@ -160,12 +166,21 @@ def on_metadata(player, metadata, recording_data):
                 encode_queue.put(prev_track)
         except AttributeError:
             pass   
+
+def on_connect(client, userdata, flags, rc):
+    client.subscribe("mrec")
+
+def on_message(client, recording_data, msg):
+    if msg.payload.decode() == "record":
+        recording_data['recording'] = True
+    elif msg.payload.decode() == "stop":
+        recording_data['recording'] = False
             
 def main(args):
     if len(args) > 1 and os.path.exists(args[1]):
         global music_root
         music_root = args[1]
-
+        
     player_name = None
     while not player_name:
         player = Playerctl.Player() 
@@ -174,10 +189,17 @@ def main(args):
     
     logging.info(f"Mrec started, {player_name} found")
 
-    recording_data = {'is_playing': False,  # track is playing 
-                      'recording': Track()} # track object to send data to 
+    recording_data = {'playing': False,  # track is playing 
+                      'recording': True,
+                      'track': Track()} # track object to send data to 
     
     on_status(player, player.get_property('playback-status'), recording_data)
+
+    client = mqtt.Client()
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.user_data_set(recording_data)
+    client.connect(broker_address, 1883, 60)
 
     # callbacks:
     player.connect('metadata', on_metadata, recording_data)
@@ -190,9 +212,10 @@ def main(args):
                                       
     encode_thread = threading.Thread(target=encode_output, 
                                       daemon = True)                        
+
     capture_thread.start()
     encode_thread.start()
-
+    client.loop_start()
     main = GLib.MainLoop()
     main.run()
     
